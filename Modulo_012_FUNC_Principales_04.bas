@@ -99,12 +99,14 @@ ErrorHandler:
 End Function
 
 
+
+
 Public Function F004_Restaurar_Delimitadores_en_Excel() As Boolean
 
     ' =============================================================================
     ' FUNCIÓN PRINCIPAL: F004_Restaurar_Delimitadores_en_Excel
     ' =============================================================================
-    ' Fecha y hora de creación: 2025-05-26 18:41:20 UTC
+    ' Fecha y hora de creación: 2025-06-16 22:27:06 UTC
     ' Usuario: david-joaquin-corredera-de-colsa
     ' Descripción: Restaura los delimitadores originales de Excel desde la hoja de respaldo
     '
@@ -133,188 +135,313 @@ Public Function F004_Restaurar_Delimitadores_en_Excel() As Boolean
     ' Compatibilidad: Excel 97, 2003, 365, OneDrive, SharePoint, Teams
     ' =============================================================================
     
-    ' Control de errores con número de línea
-    On Error GoTo ErrorHandler
+    ' Variables para control de errores
+    Dim strFuncion As String
+    Dim lngLineaError As Long
+    Dim strMensajeError As String
+    Dim strContexto As String
     
     ' Variables locales
     Dim ws As Worksheet
     Dim wb As Workbook
     Dim hojaExiste As Boolean
-    Dim i As Integer
-    Dim lineaError As Long
     Dim valorCelda As Variant
+    Dim blnScreenUpdating As Boolean
     
-    ' Inicializar resultado como exitoso
-    F004_Restaurar_Delimitadores_en_Excel = True
+    ' Inicialización
+    strFuncion = "F004_Restaurar_Delimitadores_en_Excel"
+    F004_Restaurar_Delimitadores_en_Excel = False
+    lngLineaError = 0
+    strContexto = ""
     
-    ' ==========================================================================
-    ' PASO 1: INICIALIZAR VARIABLES GLOBALES CON VALORES POR DEFECTO
-    ' ==========================================================================
-    lineaError = 100
+    On Error GoTo GestorErrores
+    
+    '--------------------------------------------------------------------------
+    ' PASO 1: LOGGING INICIAL Y CONFIGURACIÓN DE ENTORNO
+    '--------------------------------------------------------------------------
+    lngLineaError = 100
+    strContexto = "Iniciando proceso de restauración de delimitadores"
+    fun801_LogMessage "[INICIO] " & strFuncion & " - " & strContexto, False, "", strFuncion
+    fun801_LogMessage "[DETALLE] Usuario: " & Environ("USERNAME") & " | Versión Excel: " & Application.Version, False, "", strFuncion
+    
+    ' Optimización: deshabilitar actualizaciones de pantalla
+    blnScreenUpdating = Application.ScreenUpdating
+    Application.ScreenUpdating = False
+    
+    '--------------------------------------------------------------------------
+    ' PASO 2: INICIALIZAR VARIABLES GLOBALES CON VALORES POR DEFECTO
+    '--------------------------------------------------------------------------
+    lngLineaError = 110
+    strContexto = "Inicializando variables globales para delimitadores"
+    fun801_LogMessage "[PASO 1] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
     
     ' Variables para las celdas que contienen los valores originales
-    ' NOTA: Usuario especificó C2 para todas, corrijo para C2, C3, C4 según lógica
     vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal = "C2"
     vCelda_Valor_Excel_DecimalSeparator_ValorOriginal = "C3"
     vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal = "C4"
+    
+    fun801_LogMessage "[DETALLE] Celdas configuradas - UseSystem: " & vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal & _
+                      " | Decimal: " & vCelda_Valor_Excel_DecimalSeparator_ValorOriginal & _
+                      " | Thousands: " & vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal, False, "", strFuncion
     
     ' Variables para almacenar los valores originales (inicialmente vacías)
     vExcel_UseSystemSeparators_ValorOriginal = ""
     vExcel_DecimalSeparator_ValorOriginal = ""
     vExcel_ThousandsSeparator_ValorOriginal = ""
     
-    ' Usar la variable global ya definida para el nombre de la hoja
-    'If vHojaDelimitadoresExcelOriginales = "" Then
-    '    vHojaDelimitadoresExcelOriginales = CONST_HOJA_DELIMITADORES_ORIGINALES
-    'End If
+    lngLineaError = 120
     
-    lineaError = 110
+    '--------------------------------------------------------------------------
+    ' PASO 3: OBTENER REFERENCIA AL LIBRO ACTUAL
+    '--------------------------------------------------------------------------
+    lngLineaError = 130
+    strContexto = "Obteniendo referencia al libro de trabajo actual"
+    fun801_LogMessage "[PASO 2] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
     
-    ' ==========================================================================
-    ' PASO 2: OBTENER REFERENCIA AL LIBRO ACTUAL
-    ' ==========================================================================
-    
-    Set wb = ThisWorkbook           '20250616: antes esta linea era Set wb = ThisWorkbook
+    Set wb = ThisWorkbook
     If wb Is Nothing Then
-        Set wb = ActiveWorkbook     '20250616: antes esta linea era Set wb = ThisWorkbook
+        Set wb = ActiveWorkbook
+        fun801_LogMessage "[DETALLE] ThisWorkbook era Nothing, usando ActiveWorkbook", False, "", strFuncion
     End If
 
-'    If wb Is Nothing Then
-'        F004_Restaurar_Delimitadores_en_Excel = False
-'        Exit Function
-'    End If
-'
-    lineaError = 120
-    
-    ' ==========================================================================
-    ' PASO 3: VERIFICAR SI EXISTE LA HOJA DE DELIMITADORES ORIGINALES
-    ' ==========================================================================
-    
-'    hojaExiste = fun801_VerificarExistenciaHoja(wb, CONST_HOJA_DELIMITADORES_ORIGINALES)
-'
-    lineaError = 130
-    
-    ' ==========================================================================
-    ' PASO 4: CREAR HOJA O VERIFICAR VISIBILIDAD SEGÚN CORRESPONDA
-    ' ==========================================================================
-    
-'    If Not hojaExiste Then
-'        ' La hoja no existe, crearla y dejarla visible
-'        ' NOTA: En un escenario de restauración, esto sería extraño, pero cumplimos la especificación
-'        Set ws = fun802_CrearHojaDelimitadores(wb, CONST_HOJA_DELIMITADORES_ORIGINALES)
-'        If ws Is Nothing Then
-'            F004_Restaurar_Delimitadores_en_Excel = False
-'            Exit Function
-'        End If
-'        ' Como no hay datos que leer, salir con éxito pero sin restaurar
-'        Debug.Print "ADVERTENCIA: Hoja de delimitadores creada, pero no hay valores para restaurar - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
-'        Exit Function
-'    Else
-        ' La hoja existe, obtener referencia y verificar visibilidad
-'        Set ws = wb.Worksheets(CONST_HOJA_DELIMITADORES_ORIGINALES)
-        Set ws = ThisWorkbook.Worksheets(CONST_HOJA_DELIMITADORES_ORIGINALES)
-        ThisWorkbook.Worksheets(CONST_HOJA_DELIMITADORES_ORIGINALES).Visible = xlSheetVisible
-        'ws.Visible = xlSheetVisible
-        
-'        ' Verificar si está oculta y hacerla visible si es necesario
-'        If Not fun803_HacerHojaVisible(ws) Then
-'            Debug.Print "ADVERTENCIA: No se pudo hacer visible la hoja " & CONST_HOJA_DELIMITADORES_ORIGINALES & " - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
-'        End If
-'    End If
-    
-    lineaError = 140
-    
-    ' ==========================================================================
-    ' PASO 5: LEER VALORES ORIGINALES DESDE LAS CELDAS ESPECIFICADAS
-    ' ==========================================================================
-    
-    ' Leer valor de Use System Separators desde C2
-    valorCelda = ws.Range(vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal).Value
-    vExcel_UseSystemSeparators_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
-    
-    ' Leer valor de Decimal Separator desde C3
-    valorCelda = ws.Range(vCelda_Valor_Excel_DecimalSeparator_ValorOriginal).Value
-    vExcel_DecimalSeparator_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
-    
-    ' Leer valor de Thousands Separator desde C4
-    valorCelda = ws.Range(vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal).Value
-    vExcel_ThousandsSeparator_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
-    
-    lineaError = 150
-    
-    ' ==========================================================================
-    ' PASO 6: VALIDAR QUE SE HAYAN LEÍDO VALORES VÁLIDOS
-    ' ==========================================================================
-    
-    If Not fun805_ValidarValoresOriginales() Then
-        Debug.Print "ADVERTENCIA: No se encontraron valores válidos para restaurar en la hoja: " & CONST_HOJA_DELIMITADORES_ORIGINALES & " - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
-        F004_Restaurar_Delimitadores_en_Excel = False
-        Exit Function
+    If wb Is Nothing Then
+        strMensajeError = "No se pudo obtener referencia válida al libro de trabajo"
+        Err.Raise ERROR_BASE_IMPORT + 1001, strFuncion, strMensajeError
     End If
     
-    lineaError = 160
+    fun801_LogMessage "[ÉXITO] Referencia al libro obtenida - Nombre: " & wb.Name & " | Ruta: " & wb.Path, False, "", strFuncion
+
+    lngLineaError = 140
     
-    ' ==========================================================================
-    ' PASO 7: APLICAR CONFIGURACIÓN ORIGINAL DE DELIMITADORES DE EXCEL
-    ' ==========================================================================
+    '--------------------------------------------------------------------------
+    ' PASO 4: VERIFICAR SI EXISTE LA HOJA DE DELIMITADORES ORIGINALES
+    '--------------------------------------------------------------------------
+    lngLineaError = 150
+    strContexto = "Verificando existencia de hoja de delimitadores originales"
+    fun801_LogMessage "[PASO 3] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+    fun801_LogMessage "[DETALLE] Buscando hoja: " & CONST_HOJA_DELIMITADORES_ORIGINALES, False, "", strFuncion
+    
+    hojaExiste = fun801_VerificarExistenciaHoja(wb, CONST_HOJA_DELIMITADORES_ORIGINALES)
+    
+    If hojaExiste Then
+        fun801_LogMessage "[ÉXITO] Hoja de delimitadores encontrada: " & CONST_HOJA_DELIMITADORES_ORIGINALES, False, "", strFuncion
+    Else
+        fun801_LogMessage "[ADVERTENCIA] Hoja de delimitadores NO encontrada: " & CONST_HOJA_DELIMITADORES_ORIGINALES, False, "", strFuncion
+    End If
+    
+    '--------------------------------------------------------------------------
+    ' PASO 5: CREAR HOJA O VERIFICAR VISIBILIDAD SEGÚN CORRESPONDA
+    '--------------------------------------------------------------------------
+    lngLineaError = 160
+    
+    If Not hojaExiste Then
+        strContexto = "Creando hoja de delimitadores (escenario extraño para restauración)"
+        fun801_LogMessage "[PASO 4A] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+        
+        Set ws = fun802_CrearHojaDelimitadores(wb, CONST_HOJA_DELIMITADORES_ORIGINALES)
+        If ws Is Nothing Then
+            strMensajeError = "No se pudo crear la hoja de delimitadores originales: " & CONST_HOJA_DELIMITADORES_ORIGINALES
+            Err.Raise ERROR_BASE_IMPORT + 1002, strFuncion, strMensajeError
+        End If
+        
+        fun801_LogMessage "[ADVERTENCIA] Hoja creada pero no hay valores para restaurar - proceso finalizado exitosamente", False, "", strFuncion
+        F004_Restaurar_Delimitadores_en_Excel = True
+        Application.ScreenUpdating = blnScreenUpdating
+        Exit Function
+    Else
+        lngLineaError = 170
+        strContexto = "Obteniendo referencia a hoja existente y verificando visibilidad"
+        fun801_LogMessage "[PASO 4B] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+        
+        Set ws = wb.Worksheets(CONST_HOJA_DELIMITADORES_ORIGINALES)
+        fun801_LogMessage "[DETALLE] Referencia a hoja obtenida - Estado visible actual: " & ws.Visible, False, "", strFuncion
+        
+        ' Verificar si está oculta y hacerla visible si es necesario
+        If Not fun803_HacerHojaVisible(ws) Then
+            fun801_LogMessage "[ADVERTENCIA] No se pudo hacer visible la hoja " & CONST_HOJA_DELIMITADORES_ORIGINALES & _
+                              " (Línea: " & lngLineaError & ")", False, "", strFuncion
+        Else
+            fun801_LogMessage "[ÉXITO] Hoja configurada como visible: " & CONST_HOJA_DELIMITADORES_ORIGINALES, False, "", strFuncion
+        End If
+    End If
+    
+    lngLineaError = 180
+    
+    '--------------------------------------------------------------------------
+    ' PASO 6: LEER VALORES ORIGINALES DESDE LAS CELDAS ESPECIFICADAS
+    '--------------------------------------------------------------------------
+    lngLineaError = 190
+    strContexto = "Leyendo valores originales desde celdas especificadas"
+    fun801_LogMessage "[PASO 5] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+    
+    ' Leer valor de Use System Separators desde C2
+    lngLineaError = 200
+    On Error Resume Next
+    valorCelda = ws.Range(vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal).Value
+    If Err.Number <> 0 Then
+        fun801_LogMessage "[ERROR] Error al leer celda " & vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal & _
+                          " - Error: " & Err.Number & " - " & Err.Description & " (Línea: " & lngLineaError & ")", True, "", strFuncion
+        On Error GoTo GestorErrores
+        Err.Raise ERROR_BASE_IMPORT + 1003, strFuncion, "Error al leer UseSystemSeparators desde " & vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal
+    End If
+    On Error GoTo GestorErrores
+    
+    vExcel_UseSystemSeparators_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
+    fun801_LogMessage "[DETALLE] UseSystemSeparators leído - Celda: " & vCelda_Valor_Excel_UseSystemSeparators_ValorOriginal & _
+                      " | Valor raw: " & CStr(valorCelda) & " | Valor convertido: " & vExcel_UseSystemSeparators_ValorOriginal, False, "", strFuncion
+    
+    ' Leer valor de Decimal Separator desde C3
+    lngLineaError = 210
+    On Error Resume Next
+    valorCelda = ws.Range(vCelda_Valor_Excel_DecimalSeparator_ValorOriginal).Value
+    If Err.Number <> 0 Then
+        fun801_LogMessage "[ERROR] Error al leer celda " & vCelda_Valor_Excel_DecimalSeparator_ValorOriginal & _
+                          " - Error: " & Err.Number & " - " & Err.Description & " (Línea: " & lngLineaError & ")", True, "", strFuncion
+        On Error GoTo GestorErrores
+        Err.Raise ERROR_BASE_IMPORT + 1004, strFuncion, "Error al leer DecimalSeparator desde " & vCelda_Valor_Excel_DecimalSeparator_ValorOriginal
+    End If
+    On Error GoTo GestorErrores
+    
+    vExcel_DecimalSeparator_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
+    fun801_LogMessage "[DETALLE] DecimalSeparator leído - Celda: " & vCelda_Valor_Excel_DecimalSeparator_ValorOriginal & _
+                      " | Valor raw: " & CStr(valorCelda) & " | Valor convertido: " & vExcel_DecimalSeparator_ValorOriginal, False, "", strFuncion
+    
+    ' Leer valor de Thousands Separator desde C4
+    lngLineaError = 220
+    On Error Resume Next
+    valorCelda = ws.Range(vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal).Value
+    If Err.Number <> 0 Then
+        fun801_LogMessage "[ERROR] Error al leer celda " & vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal & _
+                          " - Error: " & Err.Number & " - " & Err.Description & " (Línea: " & lngLineaError & ")", True, "", strFuncion
+        On Error GoTo GestorErrores
+        Err.Raise ERROR_BASE_IMPORT + 1005, strFuncion, "Error al leer ThousandsSeparator desde " & vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal
+    End If
+    On Error GoTo GestorErrores
+    
+    vExcel_ThousandsSeparator_ValorOriginal = fun804_ConvertirValorACadena(valorCelda)
+    fun801_LogMessage "[DETALLE] ThousandsSeparator leído - Celda: " & vCelda_Valor_Excel_ThousandsSeparator_ValorOriginal & _
+                      " | Valor raw: " & CStr(valorCelda) & " | Valor convertido: " & vExcel_ThousandsSeparator_ValorOriginal, False, "", strFuncion
+
+    lngLineaError = 230
+    
+    '--------------------------------------------------------------------------
+    ' PASO 7: VALIDAR QUE SE HAYAN LEÍDO VALORES VÁLIDOS
+    '--------------------------------------------------------------------------
+    lngLineaError = 240
+    strContexto = "Validando valores leídos para restauración"
+    fun801_LogMessage "[PASO 6] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+    fun801_LogMessage "[DETALLE] Valores a validar - UseSystem: '" & vExcel_UseSystemSeparators_ValorOriginal & _
+                      "' | Decimal: '" & vExcel_DecimalSeparator_ValorOriginal & _
+                      "' | Thousands: '" & vExcel_ThousandsSeparator_ValorOriginal & "'", False, "", strFuncion
+    
+    If Not fun805_ValidarValoresOriginales() Then
+        strMensajeError = "No se encontraron valores válidos para restaurar en la hoja: " & CONST_HOJA_DELIMITADORES_ORIGINALES & _
+                         " | UseSystem: '" & vExcel_UseSystemSeparators_ValorOriginal & _
+                         "' | Decimal: '" & vExcel_DecimalSeparator_ValorOriginal & _
+                         "' | Thousands: '" & vExcel_ThousandsSeparator_ValorOriginal & "'"
+        Err.Raise ERROR_BASE_IMPORT + 1006, strFuncion, strMensajeError
+    End If
+    
+    fun801_LogMessage "[ÉXITO] Validación de valores completada exitosamente", False, "", strFuncion
+    
+    lngLineaError = 250
+    
+    '--------------------------------------------------------------------------
+    ' PASO 8: APLICAR CONFIGURACIÓN ORIGINAL DE DELIMITADORES DE EXCEL
+    '--------------------------------------------------------------------------
+    lngLineaError = 260
+    strContexto = "Aplicando configuración original de delimitadores de Excel"
+    fun801_LogMessage "[PASO 7] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
     
     ' Restaurar Use System Separators (True/False)
+    lngLineaError = 270
+    fun801_LogMessage "[SUB-PASO 7A] Restaurando UseSystemSeparators: '" & vExcel_UseSystemSeparators_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
     If Not fun806_RestaurarUseSystemSeparators(vExcel_UseSystemSeparators_ValorOriginal) Then
-        Debug.Print "ADVERTENCIA: Error al restaurar Use System Separators - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
+        fun801_LogMessage "[ADVERTENCIA] Error al restaurar UseSystemSeparators - Valor: '" & vExcel_UseSystemSeparators_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
+    Else
+        fun801_LogMessage "[ÉXITO] UseSystemSeparators restaurado exitosamente", False, "", strFuncion
     End If
     
     ' Restaurar Decimal Separator (carácter)
+    lngLineaError = 280
+    fun801_LogMessage "[SUB-PASO 7B] Restaurando DecimalSeparator: '" & vExcel_DecimalSeparator_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
     If Not fun807_RestaurarDecimalSeparator(vExcel_DecimalSeparator_ValorOriginal) Then
-        Debug.Print "ADVERTENCIA: Error al restaurar Decimal Separator - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
+        fun801_LogMessage "[ADVERTENCIA] Error al restaurar DecimalSeparator - Valor: '" & vExcel_DecimalSeparator_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
+    Else
+        fun801_LogMessage "[ÉXITO] DecimalSeparator restaurado exitosamente", False, "", strFuncion
     End If
     
     ' Restaurar Thousands Separator (carácter)
+    lngLineaError = 290
+    fun801_LogMessage "[SUB-PASO 7C] Restaurando ThousandsSeparator: '" & vExcel_ThousandsSeparator_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
     If Not fun808_RestaurarThousandsSeparator(vExcel_ThousandsSeparator_ValorOriginal) Then
-        Debug.Print "ADVERTENCIA: Error al restaurar Thousands Separator - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
+        fun801_LogMessage "[ADVERTENCIA] Error al restaurar ThousandsSeparator - Valor: '" & vExcel_ThousandsSeparator_ValorOriginal & "' (Línea: " & lngLineaError & ")", False, "", strFuncion
+    Else
+        fun801_LogMessage "[ÉXITO] ThousandsSeparator restaurado exitosamente", False, "", strFuncion
     End If
     
-    lineaError = 170
+    lngLineaError = 300
     
-    ' ==========================================================================
-    ' PASO 8: VERIFICAR SI DEBE OCULTAR LA HOJA
-    ' ==========================================================================
+    '--------------------------------------------------------------------------
+    ' PASO 9: VERIFICAR SI DEBE OCULTAR LA HOJA
+    '--------------------------------------------------------------------------
+    lngLineaError = 310
+    strContexto = "Configurando visibilidad final de la hoja de delimitadores"
+    fun801_LogMessage "[PASO 8] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
+    fun801_LogMessage "[DETALLE] Configuración de visibilidad: CONST_HOJA_DELIMITADORES_ORIGINALES_VISIBLE = " & CONST_HOJA_DELIMITADORES_ORIGINALES_VISIBLE, False, "", strFuncion
     
-    ' Verificar la variable global CONST_OCULTAR_REPOSITORIO_DELIMITADORES
+    ' Configurar visibilidad según constante global
     ThisWorkbook.Worksheets(CONST_HOJA_DELIMITADORES_ORIGINALES).Visible = CONST_HOJA_DELIMITADORES_ORIGINALES_VISIBLE
+    fun801_LogMessage "[ÉXITO] Visibilidad de hoja configurada según constante global", False, "", strFuncion
     
-    lineaError = 180
+    lngLineaError = 320
     
-    ' ==========================================================================
-    ' PASO 9: FINALIZACIÓN EXITOSA
-    ' ==========================================================================
+    '--------------------------------------------------------------------------
+    ' PASO 10: FINALIZACIÓN EXITOSA
+    '--------------------------------------------------------------------------
+    lngLineaError = 330
+    strContexto = "Finalizando proceso de restauración exitosamente"
+    fun801_LogMessage "[PASO 9] " & strContexto & " (Línea: " & lngLineaError & ")", False, "", strFuncion
     
-    Debug.Print "ÉXITO: Delimitadores restaurados correctamente - Función: F004_Restaurar_Delimitadores_en_Excel - " & Now()
+    ' Verificar delimitadores aplicados actualmente
+    fun801_LogMessage "[VERIFICACIÓN FINAL] Delimitadores actuales - Decimal: '" & Application.DecimalSeparator & _
+                      "' | Thousands: '" & Application.ThousandsSeparator & "'", False, "", strFuncion
+    
+    ' Restaurar configuración de pantalla
+    Application.ScreenUpdating = blnScreenUpdating
+    
+    fun801_LogMessage "[FINALIZACIÓN] " & strFuncion & " completado exitosamente - Total líneas procesadas: " & lngLineaError, False, "", strFuncion
+    F004_Restaurar_Delimitadores_en_Excel = True
     
     Exit Function
     
-ErrorHandler:
-    ' ==========================================================================
-    ' MANEJO EXHAUSTIVO DE ERRORES
-    ' ==========================================================================
+GestorErrores:
+    ' Restaurar configuración de pantalla
+    Application.ScreenUpdating = blnScreenUpdating
     
+    ' Construir mensaje de error exhaustivo
+    strMensajeError = "[GESTOR DE ERRORES] Error en " & strFuncion & vbCrLf & _
+                      "Línea de Error: " & lngLineaError & vbCrLf & _
+                      "Contexto: " & strContexto & vbCrLf & _
+                      "Número de Error VBA: " & Err.Number & vbCrLf & _
+                      "Descripción VBA: " & Err.Description & vbCrLf & _
+                      "Fuente del Error: " & Err.Source & vbCrLf & _
+                      "Usuario: " & Environ("USERNAME") & vbCrLf & _
+                      "Versión Excel: " & Application.Version & vbCrLf & _
+                      "Libro de Trabajo: " & IIf(wb Is Nothing, "Nothing", wb.Name) & vbCrLf & _
+                      "Hoja de Delimitadores: " & CONST_HOJA_DELIMITADORES_ORIGINALES & vbCrLf & _
+                      "Estados de Variables Globales:" & vbCrLf & _
+                      "  - UseSystemSeparators: '" & vExcel_UseSystemSeparators_ValorOriginal & "'" & vbCrLf & _
+                      "  - DecimalSeparator: '" & vExcel_DecimalSeparator_ValorOriginal & "'" & vbCrLf & _
+                      "  - ThousandsSeparator: '" & vExcel_ThousandsSeparator_ValorOriginal & "'" & vbCrLf & _
+                      "Timestamp: " & Format(Now(), "yyyy-mm-dd hh:mm:ss")
+    
+    fun801_LogMessage strMensajeError, True, "", strFuncion
     F004_Restaurar_Delimitadores_en_Excel = False
-    
-    ' Información detallada del error
-    Dim mensajeError As String
-    mensajeError = "ERROR EN FUNCIÓN: F004_Restaurar_Delimitadores_en_Excel" & vbCrLf & _
-                   "TIPO DE ERROR: " & Err.Number & " - " & Err.Description & vbCrLf & _
-                   "LÍNEA DE ERROR APROXIMADA: " & lineaError & vbCrLf & _
-                   "LÍNEA VBA: " & Erl & vbCrLf & _
-                   "FECHA Y HORA: " & Now() & vbCrLf & _
-                   "USUARIO: david-joaquin-corredera-de-colsa"
-    
-    ' Log del error para debugging
-    Debug.Print mensajeError
     
     ' Limpiar objetos
     Set ws = Nothing
     Set wb = Nothing
-    
 End Function
 
 
